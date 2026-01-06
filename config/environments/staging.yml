@@ -1,10 +1,11 @@
+---
 # Staging Environment Configuration
 
 environment:
   name: staging
   short_name: staging
   description: "Pre-production environment for UAT and final testing"
-  
+
 # API Configuration
 api:
   base_url: "https://api-staging.saasplatform.example.com"
@@ -13,7 +14,7 @@ api:
   rate_limiting:
     enabled: true
     requests_per_minute: 1000
-  
+
 # Database Configuration
 database:
   host: "staging-db.saasplatform.example.com"
@@ -22,7 +23,7 @@ database:
   ssl_enabled: true
   connection_pool_size: 20
   query_timeout_seconds: 20
-  
+
 # Storage Configuration
 storage:
   provider: "s3"
@@ -34,7 +35,7 @@ storage:
     - "application/pdf"
     - "text/csv"
     - "application/json"
-  
+
 # Authentication Configuration
 auth:
   session_duration_hours: 72  # 3 days
@@ -46,11 +47,11 @@ auth:
     require_numbers: true
     require_special_chars: false
   mfa_required: false
-  
+
 # Feature Flags
 feature_flags_enabled: true
 allow_feature_override: false
-  
+
 # Logging Configuration
 logging:
   level: "info"
@@ -58,7 +59,7 @@ logging:
   log_api_requests: true
   log_user_actions: true
   retention_days: 30
-  
+
 # Monitoring
 monitoring:
   enabled: true
@@ -66,13 +67,13 @@ monitoring:
   performance_monitoring: true
   uptime_checks_enabled: true
   uptime_check_interval_minutes: 5
-  
+
 # Email Configuration
 email:
   provider: "sendgrid"
   from_address: "noreply@staging.saasplatform.example.com"
   from_name: "SaaS Platform [STAGING]"
-  
+
 # Cache Configuration
 cache:
   enabled: true
@@ -80,7 +81,7 @@ cache:
   host: "staging-redis.saasplatform.example.com"
   port: 6379
   ttl_seconds: 600
-  
+
 # Security Settings
 security:
   cors_enabled: true
@@ -90,25 +91,25 @@ security:
   csrf_protection: true
   rate_limiting_strict: true
   ip_whitelist_enabled: false
-  
+
 # Third-party Integrations
 integrations:
   stripe:
     enabled: true
     test_mode: true
     webhook_secret: "whsec_staging_test_key"
-  
+
   analytics:
     enabled: true
     provider: "mixpanel"
     api_key: "staging_analytics_key"
-  
+
   sentry:
     enabled: true
     dsn: "https://staging@sentry.io/project"
     environment: "staging"
     sample_rate: 1.0
-  
+
 # Debugging
 debug:
   enabled: false
@@ -116,7 +117,7 @@ debug:
   pretty_print_json: true
   sql_explain_enabled: false
   profiling_enabled: true
-  
+
 # Deployment
 deployment:
   auto_deploy: true
@@ -124,21 +125,21 @@ deployment:
   build_on_push: true
   run_tests: true
   require_approval: false
-  
+
 # Resource Limits (Staging mimics production)
 limits:
   max_requests_per_second: 100
   max_concurrent_users: 1000
   max_database_connections: 100
   max_storage_per_user_gb: 500
-  
+
 # Data Management
 data:
   # Use sanitized production data snapshots
   data_source: "production_snapshot"
   refresh_schedule: "weekly"
   anonymize_pii: true
-  
+
 # Testing Configuration
 testing:
   automated_tests_enabled: true

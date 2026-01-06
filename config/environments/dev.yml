@@ -1,9 +1,10 @@
+---
 # Development Environment Configuration
 
 environment:
   name: development
   short_name: dev
-  description: "Development environment for active feature development and testing"
+  description: "Development environment for feature development and testing"
 
 # API Configuration
 api:

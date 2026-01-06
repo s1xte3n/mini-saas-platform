@@ -1,3 +1,4 @@
+---
 # Platform Features
 # Defines all available features and their tier availability
 
@@ -11,7 +12,7 @@ features:
       - pro
       - enterprise
     requires_features: []
-    
+
   - id: advanced_analytics
     name: Advanced Analytics
     description: Deep-dive analytics with custom reports and visualizations
@@ -21,7 +22,7 @@ features:
       - enterprise
     requires_features:
       - basic_dashboard
-    
+
   - id: api_access
     name: API Access
     description: RESTful API for programmatic access to platform features
@@ -34,7 +35,7 @@ features:
       free: 100
       pro: 10000
       enterprise: unlimited
-    
+
   - id: custom_integrations
     name: Custom Integrations
     description: Build and deploy custom integrations with third-party services
@@ -43,7 +44,7 @@ features:
       - enterprise
     requires_features:
       - api_access
-    
+
   - id: export_data
     name: Data Export
     description: Export your data in multiple formats (CSV, JSON, Excel)
@@ -52,7 +53,7 @@ features:
       - pro
       - enterprise
     requires_features: []
-    
+
   - id: limited_export
     name: Limited Export
     description: Export basic data in CSV format
@@ -60,7 +61,7 @@ features:
     available_in_tiers:
       - free
     requires_features: []
-    
+
   - id: white_labeling
     name: White Labeling
     description: Customize branding and domain for your organization
@@ -68,7 +69,7 @@ features:
     available_in_tiers:
       - enterprise
     requires_features: []
-    
+
   - id: priority_support
     name: Priority Support
     description: 24/7 priority customer support with dedicated account manager
@@ -76,7 +77,7 @@ features:
     available_in_tiers:
       - enterprise
     requires_features: []
-    
+
   - id: email_support
     name: Email Support
     description: Email support with 24-hour response time
@@ -85,7 +86,7 @@ features:
       - pro
       - enterprise
     requires_features: []
-    
+
   - id: sso
     name: Single Sign-On
     description: Enterprise SSO with SAML 2.0 and OAuth 2.0 support
@@ -93,7 +94,7 @@ features:
     available_in_tiers:
       - enterprise
     requires_features: []
-    
+
   - id: audit_logs
     name: Audit Logs
     description: Comprehensive audit logging for compliance and security
@@ -101,7 +102,7 @@ features:
     available_in_tiers:
       - enterprise
     requires_features: []
-    
+
   - id: team_collaboration
     name: Team Collaboration
     description: Share dashboards and collaborate with team members
@@ -110,7 +111,7 @@ features:
       - pro
       - enterprise
     requires_features: []
-    
+
   - id: real_time_alerts
     name: Real-time Alerts
     description: Get instant notifications for important events
@@ -125,31 +126,31 @@ categories:
   - id: analytics
     name: Analytics & Reporting
     description: Data visualization and reporting tools
-    
+
   - id: integration
     name: Integrations
     description: Connect with external services and APIs
-    
+
   - id: data_management
     name: Data Management
     description: Import, export, and manage your data
-    
+
   - id: customization
     name: Customization
     description: Personalize your platform experience
-    
+
   - id: support
     name: Customer Support
     description: Get help when you need it
-    
+
   - id: security
     name: Security & Compliance
     description: Enterprise-grade security features
-    
+
   - id: collaboration
     name: Collaboration
     description: Work together with your team
-    
+
   - id: notifications
     name: Notifications & Alerts
     description: Stay informed about important events
