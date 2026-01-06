@@ -1,0 +1,210 @@
+# Production Environment Configuration
+
+environment:
+  name: production
+  short_name: prod
+  description: "Live production environment serving end users"
+  
+# API Configuration
+api:
+  base_url: "https://api.saasplatform.example.com"
+  version: "v1"
+  timeout_seconds: 15
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 500
+  
+# Database Configuration
+database:
+  host: "prod-db-primary.saasplatform.example.com"
+  replica_host: "prod-db-replica.saasplatform.example.com"
+  port: 5432
+  name: "saas_production"
+  ssl_enabled: true
+  ssl_verify: true
+  connection_pool_size: 50
+  query_timeout_seconds: 10
+  
+# Storage Configuration
+storage:
+  provider: "s3"
+  bucket: "saas-production-storage"
+  region: "us-east-1"
+  cdn_enabled: true
+  cdn_url: "https://cdn.saasplatform.example.com"
+  max_file_size_mb: 25
+  allowed_file_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "application/pdf"
+    - "text/csv"
+  
+# Authentication Configuration
+auth:
+  session_duration_hours: 24  # 1 day
+  require_email_verification: true
+  allow_social_login: true
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_numbers: true
+    require_special_chars: true
+    max_age_days: 90
+  mfa_required: true  # For admin users
+  mfa_required_for_tiers:
+    - enterprise
+  
+# Feature Flags
+feature_flags_enabled: true
+allow_feature_override: false
+  
+# Logging Configuration
+logging:
+  level: "warning"
+  log_sql_queries: false
+  log_api_requests: true
+  log_user_actions: true
+  log_pii: false
+  retention_days: 90
+  
+# Monitoring
+monitoring:
+  enabled: true
+  error_tracking: true
+  performance_monitoring: true
+  uptime_checks_enabled: true
+  uptime_check_interval_minutes: 1
+  alerting:
+    enabled: true
+    channels:
+      - email
+      - slack
+      - pagerduty
+  thresholds:
+    error_rate_percentage: 1
+    response_time_ms: 500
+    cpu_usage_percentage: 80
+    memory_usage_percentage: 85
+  
+# Email Configuration
+email:
+  provider: "sendgrid"
+  from_address: "noreply@saasplatform.example.com"
+  from_name: "SaaS Platform"
+  dkim_enabled: true
+  spf_enabled: true
+  
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "redis"
+  host: "prod-redis-cluster.saasplatform.example.com"
+  port: 6379
+  ssl_enabled: true
+  ttl_seconds: 1800
+  cluster_mode: true
+  
+# Security Settings
+security:
+  cors_enabled: true
+  cors_origins:
+    - "https://saasplatform.example.com"
+    - "https://www.saasplatform.example.com"
+    - "https://app.saasplatform.example.com"
+  csrf_protection: true
+  rate_limiting_strict: true
+  ip_whitelist_enabled: false
+  waf_enabled: true
+  ddos_protection: true
+  security_headers:
+    hsts: true
+    csp: true
+    x_frame_options: "DENY"
+    x_content_type_options: true
+  
+# Third-party Integrations
+integrations:
+  stripe:
+    enabled: true
+    test_mode: false
+    webhook_secret: "whsec_production_secret"
+    api_version: "2023-10-16"
+  
+  analytics:
+    enabled: true
+    provider: "mixpanel"
+    api_key: "production_analytics_key"
+    sampling_rate: 1.0
+  
+  sentry:
+    enabled: true
+    dsn: "https://production@sentry.io/project"
+    environment: "production"
+    sample_rate: 0.1  # Sample 10% of transactions
+    traces_sample_rate: 0.01
+  
+# Debugging
+debug:
+  enabled: false
+  show_errors: false
+  pretty_print_json: false
+  sql_explain_enabled: false
+  profiling_enabled: false
+  
+# Deployment
+deployment:
+  auto_deploy: false
+  branch: "main"
+  build_on_push: false
+  run_tests: true
+  require_approval: true
+  approval_required_from:
+    - "tech-lead"
+    - "platform-team"
+  blue_green_deployment: true
+  rollback_on_error: true
+  
+# Resource Limits (Production has strict limits)
+limits:
+  max_requests_per_second: 200
+  max_concurrent_users: 10000
+  max_database_connections: 200
+  max_storage_per_user_gb: 
+    free: 5
+    pro: 100
+    enterprise: 1000
+  
+# Backup Configuration
+backup:
+  enabled: true
+  database:
+    frequency: "hourly"
+    retention_days: 30
+    full_backup_schedule: "daily"
+  storage:
+    frequency: "daily"
+    retention_days: 90
+  
+# Disaster Recovery
+disaster_recovery:
+  multi_region: true
+  failover_enabled: true
+  rto_minutes: 15  # Recovery Time Objective
+  rpo_minutes: 5   # Recovery Point Objective
+  
+# Compliance
+compliance:
+  gdpr_enabled: true
+  hipaa_enabled: false
+  soc2_compliant: true
+  data_residency: "us-east-1"
+  audit_logs_enabled: true
+  
+# Performance Optimization
+performance:
+  cdn_enabled: true
+  image_optimization: true
+  gzip_compression: true
+  http2_enabled: true
+  connection_keep_alive: true

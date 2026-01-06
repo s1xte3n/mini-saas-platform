@@ -1,0 +1,117 @@
+# User Database
+# Manages user accounts with subscription tiers and access levels
+
+users:
+  - id: usr_001
+    email: alice@example.com
+    name: Alice Johnson
+    subscription_tier: enterprise
+    role: admin
+    status: active
+    created_at: "2024-01-15"
+    features_enabled:
+      - api_access
+      - advanced_analytics
+      - custom_integrations
+      - priority_support
+      - white_labeling
+    usage_limits:
+      api_calls_per_day: unlimited
+      storage_gb: 1000
+      team_members: 50
+
+  - id: usr_002
+    email: bob@startup.io
+    name: Bob Smith
+    subscription_tier: pro
+    role: user
+    status: active
+    created_at: "2024-02-20"
+    features_enabled:
+      - api_access
+      - advanced_analytics
+      - export_data
+      - email_support
+    usage_limits:
+      api_calls_per_day: 10000
+      storage_gb: 100
+      team_members: 10
+
+  - id: usr_003
+    email: carol@freelance.com
+    name: Carol Davis
+    subscription_tier: free
+    role: user
+    status: active
+    created_at: "2024-03-05"
+    features_enabled:
+      - basic_dashboard
+      - limited_export
+    usage_limits:
+      api_calls_per_day: 100
+      storage_gb: 5
+      team_members: 1
+
+  - id: usr_004
+    email: david@enterprise.com
+    name: David Lee
+    subscription_tier: enterprise
+    role: user
+    status: active
+    created_at: "2024-01-30"
+    features_enabled:
+      - api_access
+      - advanced_analytics
+      - custom_integrations
+      - priority_support
+      - white_labeling
+      - sso
+    usage_limits:
+      api_calls_per_day: unlimited
+      storage_gb: 2000
+      team_members: 100
+
+  - id: usr_005
+    email: emma@company.com
+    name: Emma Wilson
+    subscription_tier: pro
+    role: user
+    status: trial
+    trial_ends_at: "2024-04-15"
+    created_at: "2024-03-15"
+    features_enabled:
+      - api_access
+      - advanced_analytics
+      - export_data
+    usage_limits:
+      api_calls_per_day: 10000
+      storage_gb: 100
+      team_members: 10
+
+  - id: usr_006
+    email: frank@demo.com
+    name: Frank Miller
+    subscription_tier: free
+    role: user
+    status: suspended
+    suspended_reason: payment_failed
+    created_at: "2023-12-01"
+    features_enabled:
+      - basic_dashboard
+    usage_limits:
+      api_calls_per_day: 0
+      storage_gb: 5
+      team_members: 1
+
+# User Statistics
+statistics:
+  total_users: 6
+  active_users: 5
+  by_tier:
+    free: 2
+    pro: 2
+    enterprise: 2
+  by_status:
+    active: 4
+    trial: 1
+    suspended: 1

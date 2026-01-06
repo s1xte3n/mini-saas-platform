@@ -1,0 +1,239 @@
+# Feature Flags Configuration
+# Controls feature availability and rollout across environments
+
+feature_flags:
+  advanced_analytics:
+    description: "Advanced analytics dashboard with custom reports"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+
+  api_access:
+    description: "RESTful API access for programmatic integration"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+
+  real_time_collaboration:
+    description: "Real-time collaborative editing and sharing (NEW FEATURE)"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 50
+      allowed_tiers:
+        - pro
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 10
+      allowed_tiers:
+        - enterprise
+
+  ai_insights:
+    description: "AI-powered insights and recommendations (BETA)"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 25
+      allowed_tiers:
+        - enterprise
+    prod:
+      enabled: false
+      rollout_percentage: 0
+      allowed_tiers: []
+
+  white_labeling:
+    description: "Custom branding and domain configuration"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+
+  sso:
+    description: "Single Sign-On with SAML and OAuth"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+
+  mobile_app_sync:
+    description: "Sync data with mobile applications (EXPERIMENTAL)"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+    staging:
+      enabled: false
+      rollout_percentage: 0
+      allowed_tiers: []
+    prod:
+      enabled: false
+      rollout_percentage: 0
+      allowed_tiers: []
+
+  audit_logs:
+    description: "Comprehensive audit logging for compliance"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - enterprise
+
+  dark_mode:
+    description: "Dark mode UI theme"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 80
+      allowed_tiers:
+        - free
+        - pro
+        - enterprise
+
+  custom_webhooks:
+    description: "Configure custom webhooks for events"
+    dev:
+      enabled: true
+      rollout_percentage: 100
+      allowed_tiers:
+        - pro
+        - enterprise
+    staging:
+      enabled: true
+      rollout_percentage: 50
+      allowed_tiers:
+        - pro
+        - enterprise
+    prod:
+      enabled: true
+      rollout_percentage: 30
+      allowed_tiers:
+        - enterprise
+
+# Rollout Strategy Definitions
+rollout_strategies:
+  immediate:
+    description: "Feature immediately available to all users in tier"
+    rollout_percentage: 100
+    
+  gradual:
+    description: "Gradual rollout starting at 10%, increasing weekly"
+    stages:
+      - percentage: 10
+        duration_days: 7
+      - percentage: 25
+        duration_days: 7
+      - percentage: 50
+        duration_days: 7
+      - percentage: 100
+        duration_days: null
+        
+  beta:
+    description: "Beta testing with limited rollout"
+    rollout_percentage: 25
+    requires_opt_in: true
+    
+  experimental:
+    description: "Experimental features, dev/staging only"
+    environments:
+      - dev
+      - staging
+
+# Kill Switch
+# Set to true to disable all non-critical features in production
+emergency_mode:
+  enabled: false
+  allowed_features:
+    - basic_dashboard
+    - api_access
+    - sso

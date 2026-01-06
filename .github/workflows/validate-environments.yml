@@ -1,0 +1,1029 @@
+name: Validate SaaS Platform Configuration
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - staging
+  pull_request:
+    branches:
+      - main
+      - develop
+      - staging
+  workflow_dispatch:
+
+jobs:
+  validate-yaml-syntax:
+    name: Validate YAML Syntax
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install yamllint
+        run: |
+          pip install yamllint
+      
+      - name: Validate YAML files
+        run: |
+          echo "Validating all YAML files..."
+          yamllint -d '{extends: default, rules: {line-length: {max: 120}, document-start: disable}}' \
+            config/ \
+            data/ \
+            .github/workflows/
+      
+      - name: Check for syntax errors
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import sys
+          from pathlib import Path
+          
+          errors = []
+          yaml_files = list(Path('.').rglob('*.yml')) + list(Path('.').rglob('*.yaml'))
+          
+          for file_path in yaml_files:
+              try:
+                  with open(file_path, 'r') as f:
+                      yaml.safe_load(f)
+                  print(f"✓ {file_path}")
+              except yaml.YAMLError as e:
+                  errors.append(f"✗ {file_path}: {e}")
+          
+          if errors:
+              print("\nErrors found:")
+              for error in errors:
+                  print(error)
+              sys.exit(1)
+          else:
+              print("\n✓ All YAML files are valid!")
+          EOF
+
+  validate-environment-configs:
+    name: Validate Environment Configurations
+    runs-on: ubuntu-latest
+    needs: validate-yaml-syntax
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Validate environment configs
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import sys
+          
+          required_fields = [
+              'environment.name',
+              'environment.short_name',
+              'api.base_url',
+              'database.host',
+              'security.cors_enabled',
+              'monitoring.enabled'
+          ]
+          
+          environments = ['dev', 'staging', 'prod']
+          errors = []
+          
+          for env in environments:
+              file_path = f'config/environments/{env}.yml'
+              print(f"\nValidating {file_path}...")
+              
+              try:
+                  with open(file_path, 'r') as f:
+                      config = yaml.safe_load(f)
+                  
+                  # Check required fields
+                  for field in required_fields:
+                      keys = field.split('.')
+                      value = config
+                      for key in keys:
+                          if key not in value:
+                              errors.append(f"{env}: Missing required field '{field}'")
+                              break
+                          value = value[key]
+                  
+                  # Validate environment-specific rules
+                  if env == 'prod':
+                      if config.get('debug', {}).get('enabled', False):
+                          errors.append(f"{env}: Debug mode should be disabled in production")
+                      if not config.get('security', {}).get('csrf_protection', False):
+                          errors.append(f"{env}: CSRF protection must be enabled in production")
+                      if not config.get('database', {}).get('ssl_enabled', False):
+                          errors.append(f"{env}: Database SSL must be enabled in production")
+                  
+                  if not errors:
+                      print(f"✓ {file_path} is valid")
+                  
+              except FileNotFoundError:
+                  errors.append(f"{env}: Configuration file not found")
+              except Exception as e:
+                  errors.append(f"{env}: {str(e)}")
+          
+          if errors:
+              print("\n❌ Validation errors found:")
+              for error in errors:
+                  print(f"  - {error}")
+              sys.exit(1)
+          else:
+              print("\n✅ All environment configurations are valid!")
+          EOF
+
+  validate-feature-flags:
+    name: Validate Feature Flags
+    runs-on: ubuntu-latest
+    needs: validate-yaml-syntax
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Validate feature flags
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import sys
+          
+          errors = []
+          warnings = []
+          
+          print("Validating feature flags...")
+          
+          with open('config/feature-flags.yml', 'r') as f:
+              flags = yaml.safe_load(f)
+          
+          feature_flags = flags.get('feature_flags', {})
+          environments = ['dev', 'staging', 'prod']
+          
+          for flag_name, flag_config in feature_flags.items():
+              print(f"\nChecking feature flag: {flag_name}")
+              
+              # Check all environments exist
+              for env in environments:
+                  if env not in flag_config:
+                      errors.append(f"{flag_name}: Missing environment '{env}'")
+                      continue
+                  
+                  env_config = flag_config[env]
+                  
+                  # Validate required fields
+                  if 'enabled' not in env_config:
+                      errors.append(f"{flag_name}.{env}: Missing 'enabled' field")
+                  if 'rollout_percentage' not in env_config:
+                      errors.append(f"{flag_name}.{env}: Missing 'rollout_percentage' field")
+                  
+                  # Validate rollout percentage
+                  rollout = env_config.get('rollout_percentage', 0)
+                  if not isinstance(rollout, int) or rollout < 0 or rollout > 100:
+                      errors.append(f"{flag_name}.{env}: Invalid rollout_percentage (must be 0-100)")
+                  
+                  # Check for risky production configurations
+                  if env == 'prod':
+                      if env_config.get('enabled') and rollout == 100 and not env_config.get('allowed_tiers'):
+                          warnings.append(f"{flag_name}.prod: 100% rollout without tier restrictions")
+              
+              # Validate progressive rollout
+              dev_rollout = flag_config.get('dev', {}).get('rollout_percentage', 0)
+              staging_rollout = flag_config.get('staging', {}).get('rollout_percentage', 0)
+              prod_rollout = flag_config.get('prod', {}).get('rollout_percentage', 0)
+              
+              if flag_config.get('prod', {}).get('enabled'):
+                  if prod_rollout > staging_rollout:
+                      warnings.append(f"{flag_name}: Production rollout ({prod_rollout}%) exceeds staging ({staging_rollout}%)")
+          
+          if errors:
+              print("\n❌ Validation errors:")
+              for error in errors:
+                  print(f"  - {error}")
+              sys.exit(1)
+          
+          if warnings:
+              print("\n⚠️  Warnings:")
+              for warning in warnings:
+                  print(f"  - {warning}")
+          
+          print("\n✅ Feature flags validation passed!")
+          EOF
+
+  validate-user-data:
+    name: Validate User Data
+    runs-on: ubuntu-latest
+    needs: validate-yaml-syntax
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Validate user data structure
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import sys
+          import re
+          
+          errors = []
+          
+          print("Validating user data...")
+          
+          with open('data/users.yml', 'r') as f:
+              data = yaml.safe_load(f)
+          
+          users = data.get('users', [])
+          valid_tiers = ['free', 'pro', 'enterprise']
+          valid_roles = ['user', 'admin']
+          valid_statuses = ['active', 'trial', 'suspended', 'inactive']
+          email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}## File 9: docs/release-notes.md
+
+**Location:** `mini-saas-platform\docs\release-notes.md`
+```markdown
+# Release Notes
+
+## Version 2.4.0 - January 2024
+
+### 🚀 New Features
+
+#### Real-time Collaboration (Beta)
+- **Status**: Rolling out gradually to Enterprise tier
+- **Rollout**: 10% in production, 50% in staging
+- Real-time collaborative editing and sharing capabilities
+- Live cursors showing team member activity
+- Instant synchronization across all connected devices
+- Coming soon to Pro tier users
+
+#### Dark Mode UI
+- **Status**: Live in production (80% rollout)
+- Available across all subscription tiers
+- Automatic theme switching based on system preferences
+- Manual toggle in user settings
+- Reduced eye strain for extended usage
+
+#### Custom Webhooks Enhancement
+- **Status**: Limited production rollout (30% to Enterprise)
+- Configure custom webhooks for platform events
+- Support for retry logic and dead letter queues
+- Webhook signature verification for security
+- Comprehensive event payload documentation
+
+### 🔧 Improvements
+
+- **API Performance**: Reduced average response time by 35%
+- **Dashboard Loading**: Optimized query performance for faster dashboard rendering
+- **Email Delivery**: Improved email delivery success rate to 99.8%
+- **Mobile Responsiveness**: Enhanced mobile experience across all pages
+
+### 🐛 Bug Fixes
+
+- Fixed intermittent session timeout issues for Enterprise SSO users
+- Resolved data export formatting errors for large datasets
+- Corrected timezone handling in scheduled reports
+- Fixed UI rendering issues in Safari browser
+
+### 🔒 Security Updates
+
+- Updated authentication token encryption algorithm
+- Enhanced rate limiting for API endpoints
+- Implemented additional CSRF protections
+- Security patches for dependencies
+
+---
+
+## Version 2.3.0 - December 2023
+
+### 🚀 New Features
+
+#### Advanced Analytics Dashboard
+- **Status**: Live in production
+- Customizable widgets and layouts
+- Advanced filtering and segmentation
+- Export reports in multiple formats
+- Scheduled report delivery via email
+
+#### Audit Logs
+- **Status**: Live for Enterprise tier
+- Comprehensive activity logging for compliance
+- Searchable and filterable audit trail
+- 90-day retention with export capabilities
+- Real-time event streaming
+
+### 🔧 Improvements
+
+- **Storage Optimization**: Implemented intelligent data compression
+- **Search Functionality**: Added full-text search across platform
+- **Notification System**: Redesigned notification center with better filtering
+- **API Documentation**: Enhanced API docs with interactive examples
+
+### 🐛 Bug Fixes
+
+- Resolved memory leak in real-time data updates
+- Fixed pagination issues in large data tables
+- Corrected calculation errors in analytics aggregations
+- Fixed file upload issues for files over 10MB
+
+---
+
+## Version 2.2.0 - November 2023
+
+### 🚀 New Features
+
+#### SSO Integration
+- **Status**: Live in production for Enterprise tier
+- SAML 2.0 support
+- OAuth 2.0 / OpenID Connect support
+- Automatic user provisioning
+- Group-based access control
+
+#### White Labeling
+- **Status**: Live for Enterprise customers
+- Custom domain configuration
+- Brand customization (logo, colors, fonts)
+- Custom email templates
+- Personalized login pages
+
+### 🔧 Improvements
+
+- **Performance**: Database query optimization reduced load times by 40%
+- **UI/UX**: Redesigned navigation for better user experience
+- **Mobile App**: Released companion mobile app (iOS and Android)
+- **Integrations**: Added 15 new third-party integrations
+
+### 🐛 Bug Fixes
+
+- Fixed race condition in concurrent user updates
+- Resolved caching issues causing stale data display
+- Corrected permission checks for shared resources
+- Fixed CSV export encoding issues for international characters
+
+---
+
+## Version 2.1.0 - October 2023
+
+### 🚀 New Features
+
+#### API Access for Pro Tier
+- **Status**: Live in production
+- RESTful API with comprehensive documentation
+- Rate limiting: 10,000 requests/day for Pro tier
+- Webhook support for real-time events
+- SDK libraries for popular languages
+
+#### Team Collaboration
+- **Status**: Live in production
+- Share dashboards and reports with team members
+- Role-based access control (Admin, Editor, Viewer)
+- Activity feed showing team actions
+- Comment system for collaborative discussion
+
+### 🔧 Improvements
+
+- **Onboarding**: Streamlined user onboarding process
+- **Help Center**: Expanded documentation and tutorials
+- **Performance**: CDN implementation for 60% faster asset loading
+- **Accessibility**: WCAG 2.1 AA compliance achieved
+
+---
+
+## Version 2.0.0 - September 2023
+
+### 🚀 Major Release
+
+#### Platform Redesign
+- Complete UI/UX overhaul with modern design system
+- Improved information architecture
+- Enhanced accessibility features
+- Responsive design optimized for all devices
+
+#### New Subscription Tiers
+- Introduced Free, Pro, and Enterprise tiers
+- Flexible pricing model
+- Feature differentiation by tier
+- Easy upgrade/downgrade process
+
+#### Enhanced Security
+- Two-factor authentication (2FA)
+- Session management improvements
+- Enhanced encryption for data at rest and in transit
+- Regular security audits and penetration testing
+
+---
+
+## Upcoming Features (Roadmap)
+
+### Q1 2024
+
+#### AI-Powered Insights (Beta)
+- **Target**: Limited rollout in staging (25% to Enterprise)
+- Intelligent recommendations based on usage patterns
+- Predictive analytics and forecasting
+- Natural language query interface
+- Automated anomaly detection
+
+#### Mobile App Sync
+- **Target**: Development and internal testing
+- Seamless data synchronization with mobile apps
+- Offline mode with automatic sync when online
+- Push notifications for important events
+- Native mobile experience
+
+### Q2 2024
+
+#### Advanced Workflow Automation
+- Visual workflow builder
+- Conditional logic and branching
+- Integration with external services
+- Scheduled and event-triggered workflows
+
+#### Enhanced Team Features
+- Team templates and shared resources
+- Advanced permission management
+- Team usage analytics and insights
+- Centralized billing for teams
+
+### Q3 2024
+
+#### AI Assistant
+- Conversational AI for platform navigation
+- Automated report generation
+- Smart suggestions and recommendations
+- Voice-activated commands
+
+---
+
+## Deprecation Notices
+
+### API v0 (Legacy)
+- **Deprecation Date**: March 1, 2024
+- **End of Life**: June 1, 2024
+- **Migration Guide**: [Link to documentation]
+- **Action Required**: All users must migrate to API v1
+
+### Old Dashboard UI
+- **Deprecation Date**: February 1, 2024
+- **Removal Date**: April 1, 2024
+- All users will be automatically migrated to new dashboard
+
+---
+
+## Support and Feedback
+
+We value your feedback! If you encounter any issues or have suggestions for improvements:
+
+- 📧 Email: support@saasplatform.example.com
+- 💬 In-app chat support (Pro and Enterprise tiers)
+- 🐛 Report bugs via the feedback button in the app
+- 💡 Feature requests: feedback.saasplatform.example.com
+
+---
+
+*Last updated: January 6, 2024*
+```
+
+---
+
+## File 7: config/environments/staging.yml
+
+**Location:** `mini-saas-platform\config\environments\staging.yml`
+```yaml
+# Staging Environment Configuration
+
+environment:
+  name: staging
+  short_name: staging
+  description: "Pre-production environment for UAT and final testing"
+  
+# API Configuration
+api:
+  base_url: "https://api-staging.saasplatform.example.com"
+  version: "v1"
+  timeout_seconds: 30
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 1000
+  
+# Database Configuration
+database:
+  host: "staging-db.saasplatform.example.com"
+  port: 5432
+  name: "saas_staging"
+  ssl_enabled: true
+  connection_pool_size: 20
+  query_timeout_seconds: 20
+  
+# Storage Configuration
+storage:
+  provider: "s3"
+  bucket: "saas-staging-storage"
+  region: "us-east-1"
+  max_file_size_mb: 50
+  allowed_file_types:
+    - "image/*"
+    - "application/pdf"
+    - "text/csv"
+    - "application/json"
+  
+# Authentication Configuration
+auth:
+  session_duration_hours: 72  # 3 days
+  require_email_verification: true
+  allow_social_login: true
+  password_policy:
+    min_length: 8
+    require_uppercase: true
+    require_numbers: true
+    require_special_chars: false
+  mfa_required: false
+  
+# Feature Flags
+feature_flags_enabled: true
+allow_feature_override: false
+  
+# Logging Configuration
+logging:
+  level: "info"
+  log_sql_queries: false
+  log_api_requests: true
+  log_user_actions: true
+  retention_days: 30
+  
+# Monitoring
+monitoring:
+  enabled: true
+  error_tracking: true
+  performance_monitoring: true
+  uptime_checks_enabled: true
+  uptime_check_interval_minutes: 5
+  
+# Email Configuration
+email:
+  provider: "sendgrid"
+  from_address: "noreply@staging.saasplatform.example.com"
+  from_name: "SaaS Platform [STAGING]"
+  
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "redis"
+  host: "staging-redis.saasplatform.example.com"
+  port: 6379
+  ttl_seconds: 600
+  
+# Security Settings
+security:
+  cors_enabled: true
+  cors_origins:
+    - "https://staging.saasplatform.example.com"
+    - "https://preview.saasplatform.example.com"
+  csrf_protection: true
+  rate_limiting_strict: true
+  ip_whitelist_enabled: false
+  
+# Third-party Integrations
+integrations:
+  stripe:
+    enabled: true
+    test_mode: true
+    webhook_secret: "whsec_staging_test_key"
+  
+  analytics:
+    enabled: true
+    provider: "mixpanel"
+    api_key: "staging_analytics_key"
+  
+  sentry:
+    enabled: true
+    dsn: "https://staging@sentry.io/project"
+    environment: "staging"
+    sample_rate: 1.0
+  
+# Debugging
+debug:
+  enabled: false
+  show_errors: false
+  pretty_print_json: true
+  sql_explain_enabled: false
+  profiling_enabled: true
+  
+# Deployment
+deployment:
+  auto_deploy: true
+  branch: "staging"
+  build_on_push: true
+  run_tests: true
+  require_approval: false
+  
+# Resource Limits (Staging mimics production)
+limits:
+  max_requests_per_second: 100
+  max_concurrent_users: 1000
+  max_database_connections: 100
+  max_storage_per_user_gb: 500
+  
+# Data Management
+data:
+  # Use sanitized production data snapshots
+  data_source: "production_snapshot"
+  refresh_schedule: "weekly"
+  anonymize_pii: true
+  
+# Testing Configuration
+testing:
+  automated_tests_enabled: true
+  load_testing_enabled: true
+  security_scanning_enabled: true
+  smoke_tests_on_deploy: true
+```
+
+---
+
+## File 8: config/environments/prod.yml
+
+**Location:** `mini-saas-platform\config\environments\prod.yml`
+```yaml
+# Production Environment Configuration
+
+environment:
+  name: production
+  short_name: prod
+  description: "Live production environment serving end users"
+  
+# API Configuration
+api:
+  base_url: "https://api.saasplatform.example.com"
+  version: "v1"
+  timeout_seconds: 15
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 500
+  
+# Database Configuration
+database:
+  host: "prod-db-primary.saasplatform.example.com"
+  replica_host: "prod-db-replica.saasplatform.example.com"
+  port: 5432
+  name: "saas_production"
+  ssl_enabled: true
+  ssl_verify: true
+  connection_pool_size: 50
+  query_timeout_seconds: 10
+  
+# Storage Configuration
+storage:
+  provider: "s3"
+  bucket: "saas-production-storage"
+  region: "us-east-1"
+  cdn_enabled: true
+  cdn_url: "https://cdn.saasplatform.example.com"
+  max_file_size_mb: 25
+  allowed_file_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "application/pdf"
+    - "text/csv"
+  
+# Authentication Configuration
+auth:
+  session_duration_hours: 24  # 1 day
+  require_email_verification: true
+  allow_social_login: true
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_numbers: true
+    require_special_chars: true
+    max_age_days: 90
+  mfa_required: true  # For admin users
+  mfa_required_for_tiers:
+    - enterprise
+  
+# Feature Flags
+feature_flags_enabled: true
+allow_feature_override: false
+  
+# Logging Configuration
+logging:
+  level: "warning"
+  log_sql_queries: false
+  log_api_requests: true
+  log_user_actions: true
+  log_pii: false
+  retention_days: 90
+  
+# Monitoring
+monitoring:
+  enabled: true
+  error_tracking: true
+  performance_monitoring: true
+  uptime_checks_enabled: true
+  uptime_check_interval_minutes: 1
+  alerting:
+    enabled: true
+    channels:
+      - email
+      - slack
+      - pagerduty
+  thresholds:
+    error_rate_percentage: 1
+    response_time_ms: 500
+    cpu_usage_percentage: 80
+    memory_usage_percentage: 85
+  
+# Email Configuration
+email:
+  provider: "sendgrid"
+  from_address: "noreply@saasplatform.example.com"
+  from_name: "SaaS Platform"
+  dkim_enabled: true
+  spf_enabled: true
+  
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "redis"
+  host: "prod-redis-cluster.saasplatform.example.com"
+  port: 6379
+  ssl_enabled: true
+  ttl_seconds: 1800
+  cluster_mode: true
+  
+# Security Settings
+security:
+  cors_enabled: true
+  cors_origins:
+    - "https://saasplatform.example.com"
+    - "https://www.saasplatform.example.com"
+    - "https://app.saasplatform.example.com"
+  csrf_protection: true
+  rate_limiting_strict: true
+  ip_whitelist_enabled: false
+  waf_enabled: true
+  ddos_protection: true
+  security_headers:
+    hsts: true
+    csp: true
+    x_frame_options: "DENY"
+    x_content_type_options: true
+  
+# Third-party Integrations
+integrations:
+  stripe:
+    enabled: true
+    test_mode: false
+    webhook_secret: "whsec_production_secret"
+    api_version: "2023-10-16"
+  
+  analytics:
+    enabled: true
+    provider: "mixpanel"
+    api_key: "production_analytics_key"
+    sampling_rate: 1.0
+  
+  sentry:
+    enabled: true
+    dsn: "https://production@sentry.io/project"
+    environment: "production"
+    sample_rate: 0.1  # Sample 10% of transactions
+    traces_sample_rate: 0.01
+  
+# Debugging
+debug:
+  enabled: false
+  show_errors: false
+  pretty_print_json: false
+  sql_explain_enabled: false
+  profiling_enabled: false
+  
+# Deployment
+deployment:
+  auto_deploy: false
+  branch: "main"
+  build_on_push: false
+  run_tests: true
+  require_approval: true
+  approval_required_from:
+    - "tech-lead"
+    - "platform-team"
+  blue_green_deployment: true
+  rollback_on_error: true
+  
+# Resource Limits (Production has strict limits)
+limits:
+  max_requests_per_second: 200
+  max_concurrent_users: 10000
+  max_database_connections: 200
+  max_storage_per_user_gb: 
+    free: 5
+    pro: 100
+    enterprise: 1000
+  
+# Backup Configuration
+backup:
+  enabled: true
+  database:
+    frequency: "hourly"
+    retention_days: 30
+    full_backup_schedule: "daily"
+  storage:
+    frequency: "daily"
+    retention_days: 90
+  
+# Disaster Recovery
+disaster_recovery:
+  multi_region: true
+  failover_enabled: true
+  rto_minutes: 15  # Recovery Time Objective
+  rpo_minutes: 5   # Recovery Point Objective
+  
+# Compliance
+compliance:
+  gdpr_enabled: true
+  hipaa_enabled: false
+  soc2_compliant: true
+  data_residency: "us-east-1"
+  audit_logs_enabled: true
+  
+# Performance Optimization
+performance:
+  cdn_enabled: true
+  image_optimization: true
+  gzip_compression: true
+  http2_enabled: true
+  connection_keep_alive: true
+```
+
+---
+
+)
+          
+          user_ids = set()
+          emails = set()
+          
+          for idx, user in enumerate(users):
+              user_id = user.get('id', f'unknown_{idx}')
+              print(f"\nValidating user: {user_id}")
+              
+              # Check required fields
+              required_fields = ['id', 'email', 'name', 'subscription_tier', 'role', 'status']
+              for field in required_fields:
+                  if field not in user:
+                      errors.append(f"User {user_id}: Missing required field '{field}'")
+              
+              # Validate email format
+              email = user.get('email')
+              if email:
+                  if not email_pattern.match(email):
+                      errors.append(f"User {user_id}: Invalid email format '{email}'")
+                  if email in emails:
+                      errors.append(f"User {user_id}: Duplicate email '{email}'")
+                  emails.add(email)
+              
+              # Check for duplicate IDs
+              if user_id in user_ids:
+                  errors.append(f"Duplicate user ID: {user_id}")
+              user_ids.add(user_id)
+              
+              # Validate tier
+              tier = user.get('subscription_tier')
+              if tier and tier not in valid_tiers:
+                  errors.append(f"User {user_id}: Invalid subscription_tier '{tier}'")
+              
+              # Validate role
+              role = user.get('role')
+              if role and role not in valid_roles:
+                  errors.append(f"User {user_id}: Invalid role '{role}'")
+              
+              # Validate status
+              status = user.get('status')
+              if status and status not in valid_statuses:
+                  errors.append(f"User {user_id}: Invalid status '{status}'")
+          
+          if errors:
+              print("\n❌ Validation errors:")
+              for error in errors:
+                  print(f"  - {error}")
+              sys.exit(1)
+          
+          print(f"\n✅ User data validation passed! ({len(users)} users)")
+          EOF
+
+  validate-features:
+    name: Validate Features Data
+    runs-on: ubuntu-latest
+    needs: validate-yaml-syntax
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Validate features structure
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import sys
+          
+          errors = []
+          
+          print("Validating features data...")
+          
+          with open('data/features.yml', 'r') as f:
+              data = yaml.safe_load(f)
+          
+          features = data.get('features', [])
+          categories = {cat['id'] for cat in data.get('categories', [])}
+          valid_tiers = ['free', 'pro', 'enterprise']
+          
+          feature_ids = set()
+          
+          for feature in features:
+              feature_id = feature.get('id', 'unknown')
+              print(f"\nValidating feature: {feature_id}")
+              
+              # Check required fields
+              required_fields = ['id', 'name', 'description', 'category', 'available_in_tiers']
+              for field in required_fields:
+                  if field not in feature:
+                      errors.append(f"Feature {feature_id}: Missing required field '{field}'")
+              
+              # Check for duplicate IDs
+              if feature_id in feature_ids:
+                  errors.append(f"Duplicate feature ID: {feature_id}")
+              feature_ids.add(feature_id)
+              
+              # Validate category
+              category = feature.get('category')
+              if category and category not in categories:
+                  errors.append(f"Feature {feature_id}: Unknown category '{category}'")
+              
+              # Validate tiers
+              tiers = feature.get('available_in_tiers', [])
+              for tier in tiers:
+                  if tier not in valid_tiers:
+                      errors.append(f"Feature {feature_id}: Invalid tier '{tier}'")
+              
+              # Validate dependencies
+              requires = feature.get('requires_features', [])
+              for req in requires:
+                  if req not in feature_ids and req not in [f.get('id') for f in features]:
+                      errors.append(f"Feature {feature_id}: Unknown dependency '{req}'")
+          
+          if errors:
+              print("\n❌ Validation errors:")
+              for error in errors:
+                  print(f"  - {error}")
+              sys.exit(1)
+          
+          print(f"\n✅ Features validation passed! ({len(features)} features)")
+          EOF
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: 
+      - validate-yaml-syntax
+      - validate-environment-configs
+      - validate-feature-flags
+      - validate-user-data
+      - validate-features
+    if: always()
+    
+    steps:
+      - name: Check validation results
+        run: |
+          echo "### Validation Summary"
+          echo ""
+          echo "All validation checks completed!"
+          echo ""
+          echo "✅ YAML Syntax"
+          echo "✅ Environment Configurations"
+          echo "✅ Feature Flags"
+          echo "✅ User Data"
+          echo "✅ Features Data"
+          echo ""
+          echo "Platform configuration is valid and ready for deployment! 🚀"
