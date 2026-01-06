@@ -205,7 +205,7 @@ rollout_strategies:
   immediate:
     description: "Feature immediately available to all users in tier"
     rollout_percentage: 100
-    
+
   gradual:
     description: "Gradual rollout starting at 10%, increasing weekly"
     stages:
@@ -217,12 +217,12 @@ rollout_strategies:
         duration_days: 7
       - percentage: 100
         duration_days: null
-        
+
   beta:
     description: "Beta testing with limited rollout"
     rollout_percentage: 25
     requires_opt_in: true
-    
+
   experimental:
     description: "Experimental features, dev/staging only"
     environments:

@@ -1,6 +1,6 @@
 name: Validate SaaS Platform Configuration
 
-on:
+"on":
   push:
     branches:
       - main

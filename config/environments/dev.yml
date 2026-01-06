@@ -4,7 +4,7 @@ environment:
   name: development
   short_name: dev
   description: "Development environment for active feature development and testing"
-  
+
 # API Configuration
 api:
   base_url: "https://api-dev.saasplatform.example.com"
@@ -13,7 +13,7 @@ api:
   rate_limiting:
     enabled: false
     requests_per_minute: unlimited
-  
+
 # Database Configuration
 database:
   host: "dev-db.saasplatform.example.com"
@@ -22,7 +22,7 @@ database:
   ssl_enabled: false
   connection_pool_size: 10
   query_timeout_seconds: 30
-  
+
 # Storage Configuration
 storage:
   provider: "local"
@@ -34,7 +34,7 @@ storage:
     - "application/pdf"
     - "text/csv"
     - "application/json"
-  
+
 # Authentication Configuration
 auth:
   session_duration_hours: 168  # 7 days
@@ -46,11 +46,11 @@ auth:
     require_numbers: false
     require_special_chars: false
   mfa_required: false
-  
+
 # Feature Flags
 feature_flags_enabled: true
 allow_feature_override: true
-  
+
 # Logging Configuration
 logging:
   level: "debug"
@@ -58,20 +58,20 @@ logging:
   log_api_requests: true
   log_user_actions: true
   retention_days: 7
-  
+
 # Monitoring
 monitoring:
   enabled: true
   error_tracking: true
   performance_monitoring: true
   uptime_checks_enabled: false
-  
+
 # Email Configuration
 email:
   provider: "mailhog"  # Local testing SMTP
   from_address: "noreply@dev.saasplatform.example.com"
   from_name: "SaaS Platform [DEV]"
-  
+
 # Cache Configuration
 cache:
   enabled: true
@@ -79,7 +79,7 @@ cache:
   host: "dev-redis.saasplatform.example.com"
   port: 6379
   ttl_seconds: 300
-  
+
 # Security Settings
 security:
   cors_enabled: true
@@ -90,23 +90,23 @@ security:
   csrf_protection: true
   rate_limiting_strict: false
   ip_whitelist_enabled: false
-  
+
 # Third-party Integrations
 integrations:
   stripe:
     enabled: true
     test_mode: true
     webhook_secret: "whsec_dev_test_key"
-  
+
   analytics:
     enabled: false
     provider: null
-  
+
   sentry:
     enabled: true
     dsn: "https://dev@sentry.io/project"
     environment: "development"
-  
+
 # Debugging
 debug:
   enabled: true
@@ -114,14 +114,14 @@ debug:
   pretty_print_json: true
   sql_explain_enabled: true
   profiling_enabled: true
-  
+
 # Deployment
 deployment:
   auto_deploy: true
   branch: "develop"
   build_on_push: true
   run_tests: true
-  
+
 # Resource Limits (Development is generous)
 limits:
   max_requests_per_second: unlimited
