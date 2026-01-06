@@ -17,35 +17,35 @@ jobs:
   validate-yaml-syntax:
     name: Validate YAML Syntax
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install yamllint
         run: |
           pip install yamllint
-      
+
       - name: Validate YAML files
         run: |
           echo "Validating all YAML files..."
           yamllint -d '{extends: default, rules: {line-length: {max: 120}, document-start: disable}}' config/ data/ .github/workflows/ || true
-      
+
       - name: Check for syntax errors
         run: |
           python3 -c "
           import yaml
           import sys
           from pathlib import Path
-          
+
           errors = []
           yaml_files = list(Path('.').rglob('*.yml')) + list(Path('.').rglob('*.yaml'))
-          
+
           for file_path in yaml_files:
               try:
                   with open(file_path, 'r') as f:
@@ -53,7 +53,7 @@ jobs:
                   print(f'✓ {file_path}')
               except yaml.YAMLError as e:
                   errors.append(f'✗ {file_path}: {e}')
-          
+
           if errors:
               print('Errors found:')
               for error in errors:
@@ -67,22 +67,25 @@ jobs:
     name: Validate Environment Configurations
     runs-on: ubuntu-latest
     needs: validate-yaml-syntax
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate environment configs
         run: |
           python3 -c "
           import yaml
           import sys
-          
+
           required_fields = [
               'environment.name',
               'environment.short_name',
@@ -91,18 +94,18 @@ jobs:
               'security.cors_enabled',
               'monitoring.enabled'
           ]
-          
+
           environments = ['dev', 'staging', 'prod']
           errors = []
-          
+
           for env in environments:
               file_path = f'config/environments/{env}.yml'
               print(f'Validating {file_path}...')
-              
+
               try:
                   with open(file_path, 'r') as f:
                       config = yaml.safe_load(f)
-                  
+
                   for field in required_fields:
                       keys = field.split('.')
                       value = config
@@ -111,7 +114,7 @@ jobs:
                               errors.append(f'{env}: Missing required field {field}')
                               break
                           value = value[key]
-                  
+
                   if env == 'prod':
                       if config.get('debug', {}).get('enabled', False):
                           errors.append(f'{env}: Debug mode should be disabled in production')
@@ -119,15 +122,15 @@ jobs:
                           errors.append(f'{env}: CSRF protection must be enabled in production')
                       if not config.get('database', {}).get('ssl_enabled', False):
                           errors.append(f'{env}: Database SSL must be enabled in production')
-                  
+
                   if not errors:
                       print(f'✓ {file_path} is valid')
-                  
+
               except FileNotFoundError:
                   errors.append(f'{env}: Configuration file not found')
               except Exception as e:
                   errors.append(f'{env}: {str(e)}')
-          
+
           if errors:
               print('Validation errors found:')
               for error in errors:
@@ -141,75 +144,78 @@ jobs:
     name: Validate Feature Flags
     runs-on: ubuntu-latest
     needs: validate-yaml-syntax
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate feature flags
         run: |
           python3 -c "
           import yaml
           import sys
-          
+
           errors = []
           warnings = []
-          
+
           print('Validating feature flags...')
-          
+
           with open('config/feature-flags.yml', 'r') as f:
               flags = yaml.safe_load(f)
-          
+
           feature_flags = flags.get('feature_flags', {})
           environments = ['dev', 'staging', 'prod']
-          
+
           for flag_name, flag_config in feature_flags.items():
               print(f'Checking feature flag: {flag_name}')
-              
+
               for env in environments:
                   if env not in flag_config:
                       errors.append(f'{flag_name}: Missing environment {env}')
                       continue
-                  
+
                   env_config = flag_config[env]
-                  
+
                   if 'enabled' not in env_config:
                       errors.append(f'{flag_name}.{env}: Missing enabled field')
                   if 'rollout_percentage' not in env_config:
                       errors.append(f'{flag_name}.{env}: Missing rollout_percentage field')
-                  
+
                   rollout = env_config.get('rollout_percentage', 0)
                   if not isinstance(rollout, int) or rollout < 0 or rollout > 100:
                       errors.append(f'{flag_name}.{env}: Invalid rollout_percentage (must be 0-100)')
-                  
+
                   if env == 'prod':
                       if env_config.get('enabled') and rollout == 100 and not env_config.get('allowed_tiers'):
                           warnings.append(f'{flag_name}.prod: 100% rollout without tier restrictions')
-              
+
               dev_rollout = flag_config.get('dev', {}).get('rollout_percentage', 0)
               staging_rollout = flag_config.get('staging', {}).get('rollout_percentage', 0)
               prod_rollout = flag_config.get('prod', {}).get('rollout_percentage', 0)
-              
+
               if flag_config.get('prod', {}).get('enabled'):
                   if prod_rollout > staging_rollout:
                       warnings.append(f'{flag_name}: Production rollout ({prod_rollout}%) exceeds staging ({staging_rollout}%)')
-          
+
           if errors:
               print('Validation errors:')
               for error in errors:
                   print(f'  - {error}')
               sys.exit(1)
-          
+
           if warnings:
               print('Warnings:')
               for warning in warnings:
                   print(f'  - {warning}')
-          
+
           print('✅ Feature flags validation passed!')
           "
 
@@ -217,48 +223,51 @@ jobs:
     name: Validate User Data
     runs-on: ubuntu-latest
     needs: validate-yaml-syntax
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate user data structure
         run: |
           python3 -c "
           import yaml
           import sys
           import re
-          
+
           errors = []
-          
+
           print('Validating user data...')
-          
+
           with open('data/users.yml', 'r') as f:
               data = yaml.safe_load(f)
-          
+
           users = data.get('users', [])
           valid_tiers = ['free', 'pro', 'enterprise']
           valid_roles = ['user', 'admin']
           valid_statuses = ['active', 'trial', 'suspended', 'inactive']
           email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-          
+
           user_ids = set()
           emails = set()
-          
+
           for idx, user in enumerate(users):
               user_id = user.get('id', f'unknown_{idx}')
               print(f'Validating user: {user_id}')
-              
+
               required_fields = ['id', 'email', 'name', 'subscription_tier', 'role', 'status']
               for field in required_fields:
                   if field not in user:
                       errors.append(f'User {user_id}: Missing required field {field}')
-              
+
               email = user.get('email')
               if email:
                   if not email_pattern.match(email):
@@ -266,29 +275,29 @@ jobs:
                   if email in emails:
                       errors.append(f'User {user_id}: Duplicate email {email}')
                   emails.add(email)
-              
+
               if user_id in user_ids:
                   errors.append(f'Duplicate user ID: {user_id}')
               user_ids.add(user_id)
-              
+
               tier = user.get('subscription_tier')
               if tier and tier not in valid_tiers:
                   errors.append(f'User {user_id}: Invalid subscription_tier {tier}')
-              
+
               role = user.get('role')
               if role and role not in valid_roles:
                   errors.append(f'User {user_id}: Invalid role {role}')
-              
+
               status = user.get('status')
               if status and status not in valid_statuses:
                   errors.append(f'User {user_id}: Invalid status {status}')
-          
+
           if errors:
               print('Validation errors:')
               for error in errors:
                   print(f'  - {error}')
               sys.exit(1)
-          
+
           print(f'✅ User data validation passed! ({len(users)} users)')
           "
 
@@ -296,82 +305,85 @@ jobs:
     name: Validate Features Data
     runs-on: ubuntu-latest
     needs: validate-yaml-syntax
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate features structure
         run: |
           python3 -c "
           import yaml
           import sys
-          
+
           errors = []
-          
+
           print('Validating features data...')
-          
+
           with open('data/features.yml', 'r') as f:
               data = yaml.safe_load(f)
-          
+
           features = data.get('features', [])
           categories = {cat['id'] for cat in data.get('categories', [])}
           valid_tiers = ['free', 'pro', 'enterprise']
-          
+
           feature_ids = set()
-          
+
           for feature in features:
               feature_id = feature.get('id', 'unknown')
               print(f'Validating feature: {feature_id}')
-              
+
               required_fields = ['id', 'name', 'description', 'category', 'available_in_tiers']
               for field in required_fields:
                   if field not in feature:
                       errors.append(f'Feature {feature_id}: Missing required field {field}')
-              
+
               if feature_id in feature_ids:
                   errors.append(f'Duplicate feature ID: {feature_id}')
               feature_ids.add(feature_id)
-              
+
               category = feature.get('category')
               if category and category not in categories:
                   errors.append(f'Feature {feature_id}: Unknown category {category}')
-              
+
               tiers = feature.get('available_in_tiers', [])
               for tier in tiers:
                   if tier not in valid_tiers:
                       errors.append(f'Feature {feature_id}: Invalid tier {tier}')
-              
+
               requires = feature.get('requires_features', [])
               for req in requires:
                   if req not in feature_ids and req not in [f.get('id') for f in features]:
                       errors.append(f'Feature {feature_id}: Unknown dependency {req}')
-          
+
           if errors:
               print('Validation errors:')
               for error in errors:
                   print(f'  - {error}')
               sys.exit(1)
-          
+
           print(f'✅ Features validation passed! ({len(features)} features)')
           "
 
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - validate-yaml-syntax
       - validate-environment-configs
       - validate-feature-flags
       - validate-user-data
       - validate-features
     if: always()
-    
+
     steps:
       - name: Check validation results
         run: |
